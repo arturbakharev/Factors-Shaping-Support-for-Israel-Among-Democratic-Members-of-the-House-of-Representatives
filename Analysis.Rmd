@@ -1,0 +1,236 @@
+---
+title: Factors Shaping Support for Israel Among Democratic Members of the House of
+  Representatives
+author: "Artur Bakharev"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  html_notebook:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(modelsummary)
+library(ggplot2)
+```
+
+```{r}
+# ==============================================================================
+# DATA LOADING AND PREPARATION
+# ==============================================================================
+df <- read_csv("data.csv")
+
+df_dem <- df %>%
+  filter(Party == "Dem") %>%
+  mutate(
+    Race = relevel(as.factor(Race), ref = "White"),
+    Gender = as.factor(Gender),
+    
+    # Calculate Protest Surges
+    Surge_Israel_V2 = pmax(0, Region_Israel_V2 - Region_Israel_V1),
+    Surge_Palestine_V2 = pmax(0, Region_Palestine_V2 - Region_Palestine_V1),
+    Surge_Isr_V2_log = log1p(Surge_Israel_V2),
+    Surge_Pal_V2_log = log1p(Surge_Palestine_V2),
+    
+    Surge_Israel_V3 = pmax(0, Region_Israel_V3 - Region_Israel_V2),
+    Surge_Palestine_V3 = pmax(0, Region_Palestine_V3 - Region_Palestine_V2),
+    Surge_Isr_V3_log = log1p(Surge_Israel_V3),
+    Surge_Pal_V3_log = log1p(Surge_Palestine_V3)
+  )
+```
+
+```{r}
+# ==============================================================================
+# TABLE 1: DYNAMIC SENTIMENT MODELS
+# ==============================================================================
+# Transition 1 & 2 for Twitter Stance
+mod_stance_v2 <- lm(
+  Stance_UpTo_V2 ~ Stance_UpTo_V1 + Gender + Race + PVI + JewishPop + AIPAC_norm + Surge_Isr_V2_log + Surge_Pal_V2_log, 
+  data = df_dem
+)
+
+mod_stance_v3 <- lm(
+  Stance_UpTo_V3 ~ Stance_UpTo_V2 + Gender + Race + PVI + JewishPop + AIPAC_norm + Surge_Isr_V3_log + Surge_Pal_V3_log, 
+  data = df_dem
+)
+
+coef_map_stance <- c(
+  "(Intercept)" = "Intercept",
+  "Stance_UpTo_V1" = "Previous Stance (Up to V1)",
+  "Stance_UpTo_V2" = "Previous Stance (Up to V2)",
+  "GenderM" = "Male (vs Female)",        
+  "GenderMale" = "Male (vs Female)", 
+  "RaceBlack" = "Black (vs White)",
+  "RaceHispanic" = "Hispanic (vs White)",
+  "RaceAsian" = "Asian (vs White)",
+  "RaceJewish" = "Jewish (vs White)",
+  "PVI" = "PVI (Cook Index)",
+  "JewishPop" = "District Jewish Pop %",
+  "AIPAC_norm" = "AIPAC Contributions (Std)",
+  "Surge_Isr_V2_log" = "New Pro-Israel Protests (V2, Log)",
+  "Surge_Isr_V3_log" = "New Pro-Israel Protests (V3, Log)",
+  "Surge_Pal_V2_log" = "New Pro-Palestine Protests (V2, Log)",
+  "Surge_Pal_V3_log" = "New Pro-Palestine Protests (V3, Log)"
+)
+
+modelsummary(
+  list("Stance V2 (Base: V1)" = mod_stance_v2, 
+       "Stance V3 (Base: V2)" = mod_stance_v3),
+  coef_map = coef_map_stance,
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  gof_map = c("nobs", "r.squared", "adj.r.squared", "rmse"),
+  title = "Table 1"
+)
+```
+
+```{r}
+# ==============================================================================
+# TABLE 2
+# ==============================================================================
+df_dem_avg <- df_dem %>%
+  filter(!is.na(Average_Stance_Israel))
+
+mod_stance_overall <- lm(
+  Average_Stance_Israel ~ Gender + Race + PVI + JewishPop + AIPAC_norm, 
+  data = df_dem_avg
+)
+
+# ==============================================================================
+# OUTPUT GENERATION
+# ==============================================================================
+coef_map_stance_overall <- c(
+  "(Intercept)" = "Intercept",
+  "GenderM" = "Male (vs Female)", 
+  "GenderMale" = "Male (vs Female)", 
+  "RaceBlack" = "Black (vs White)",
+  "RaceHispanic" = "Hispanic (vs White)",
+  "RaceAsian" = "Asian (vs White)",
+  "RaceJewish" = "Jewish (vs White)",
+  "PVI" = "PVI (Cook Index)",
+  "JewishPop" = "District Jewish Pop %",
+  "AIPAC_norm" = "AIPAC Contributions (Std)"
+)
+modelsummary(
+  list("Stance Score" = mod_stance_overall),
+  coef_map = coef_map_stance_overall,
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  gof_map = c("nobs", "r.squared", "adj.r.squared", "rmse")
+)
+```
+
+```{r}
+# ==============================================================================
+# VOTE TRANSITION TABLE
+# ==============================================================================
+print("Vote Transition: November (V1) to February (V2):")
+table(Previous = df_dem$V1, Current = df_dem$V2)
+
+print("Vote Transition: February (V2) to April (V3):")
+table(Previous = df_dem$V2, Current = df_dem$V3)
+
+# ==============================================================================
+# FIRTH REGRESSIONS
+# ==============================================================================
+library(logistf)
+library(modelsummary)
+
+# Transition 1: November (V1) -> February (V2)
+mod_firth_v2 <- logistf(
+  V2 ~ V1 + Gender + Race + PVI + JewishPop + AIPAC_norm + Surge_Isr_V2_log + Surge_Pal_V2_log, 
+  data = df_dem
+)
+
+# Transition 2: February (V2) -> April (V3)
+mod_firth_v3 <- logistf(
+  V3 ~ V2 + Gender + Race + PVI + JewishPop + AIPAC_norm + Surge_Isr_V3_log + Surge_Pal_V3_log, 
+  data = df_dem
+)
+
+# ==============================================================================
+# TABLE OUTPUT
+# ==============================================================================
+coef_map_firth <- c(
+  "V1" = "Previous Vote (V1)",
+  "V2" = "Previous Vote (V2)",
+  
+  # Identity Controls
+  "GenderMale" = "Male (vs Female)",
+  "RaceArab" = "Arab (vs White)",
+  "RaceAsian" = "Asian (vs White)",
+  "RaceBlack" = "Black (vs White)",
+  "RaceHispanic" = "Hispanic (vs White)",
+  "RaceJewish" = "Jewish (vs White)",
+  "RaceNative American" = "Native American (vs White)",
+  
+  # Structural Controls
+  "PVI" = "PVI (Cook Index)",
+  "JewishPop" = "District Jewish Pop %",
+  "AIPAC_norm" = "AIPAC Contributions (Std)",
+  
+  # Protest Surges
+  "Surge_Isr_V2_log" = "New Pro-Israel Protests (V2, Log)",
+  "Surge_Isr_V3_log" = "New Pro-Israel Protests (V3, Log)",
+  "Surge_Pal_V2_log" = "New Pro-Palestine Protests (V2, Log)",
+  "Surge_Pal_V3_log" = "New Pro-Palestine Protests (V3, Log)"
+)
+
+# Combine both models into a single table
+modelsummary(
+  list("Firth V2 (Base: V1)" = mod_firth_v2, 
+       "Firth V3 (Base: V2)" = mod_firth_v3),
+  coef_map = coef_map_firth,
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  gof_map = c("nobs", "logLik"), 
+  title = "Table 3. Firth Penalized Logistic Regression for Vote Switching"
+)
+```
+
+```{r}
+# ==============================================================================
+# MEAN COMPARISON AND T-TEST
+# ==============================================================================
+summary_stats <- df_dem %>%
+  filter(!is.na(Average_Stance_Israel) & !is.na(V3)) %>%
+  group_by(V3) %>%
+  summarise(
+    Count = n(),
+    Mean_Stance = round(mean(Average_Stance_Israel), 3),
+    Median_Stance = round(median(Average_Stance_Israel), 3)
+  )
+
+# Perform a t-test to check if the difference is statistically significant
+t_test_result <- t.test(Average_Stance_Israel ~ V3, data = df_dem)
+print(t_test_result)
+
+# ==============================================================================
+# VISUALIZATION
+# ==============================================================================
+ggplot(df_dem %>% filter(!is.na(Average_Stance_Israel) & !is.na(V3)), 
+       aes(x = factor(V3, labels = c("Voted 'Nay' (Opposed)", "Voted 'Yea' (Supported)")), 
+           y = Average_Stance_Israel)) +
+  geom_boxplot(fill = "gray90", color = "black", outlier.shape = NA, width = 0.5) +
+  geom_jitter(color = "gray40", alpha = 0.6, width = 0.15, size = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.5) +
+  theme_minimal() +
+  labs(
+    title = "Figure 3. Distribution of digital stance scores by final roll-call vote on H.R. 8034",
+    x = "Final Vote on Substantive Aid Package (H.R. 8034)",
+    y = "Average Twitter Stance (-1 = Critical, 1 = Pro-Israel)"
+  ) +
+  theme(
+    legend.position = "none",
+    text = element_text(family = "Arial", size = 11),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.text.x = element_text(size = 11, face = "bold"),
+    panel.grid.major.x = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  )
+```
+
