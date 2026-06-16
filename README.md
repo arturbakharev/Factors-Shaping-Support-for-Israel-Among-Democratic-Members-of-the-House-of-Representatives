@@ -1,6 +1,6 @@
 # Factors Shaping Support for Israel Among Democratic Members of the U.S. House of Representatives
 
-A data-driven Mater's Thesis analyzing legislative behavior, voting dynamics, and external policy factors in the U.S. House of Representatives.
+A data-driven research analyzing legislative behavior, voting dynamics, and external policy factors in the U.S. House of Representatives.
 
 ## Project Overview
 This repository contains the analytical pipeline, statistical models, and econometric methodology for my Master's Thesis. The project models how various behavioral, political, financial, and social vectors influence voting patterns and digital stances on critical foreign policy legislation over consecutive timeframes (November to April)[cite: 6].
