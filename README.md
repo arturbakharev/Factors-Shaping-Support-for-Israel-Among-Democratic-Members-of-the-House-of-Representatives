@@ -3,7 +3,7 @@
 A data-driven research analyzing legislative behavior, voting dynamics, and external policy factors in the U.S. House of Representatives.
 
 ## Project Overview
-This repository contains the analytical pipeline, statistical models, and econometric methodology for my Master's Thesis. The project models how various behavioral, political, financial, and social vectors influence voting patterns and digital stances on critical foreign policy legislation over consecutive timeframes (November to April)[cite: 6].
+This repository contains the analytical pipeline, statistical models, and econometric methodology for my Master's Thesis. The project models how various behavioral, political, financial, and social vectors influence voting patterns and digital stances on critical foreign policy legislation over consecutive timeframes (November to April).
 
 ## Key Technical & Methodology Highlights
 * **Rare Event Modeling (Firth Penalization):** Utilized Firth Penalized Logistic Regression (`logistf`) for vote transition modeling to robustly handle rare events and prevent complete separation issues common in standard logistic models.
